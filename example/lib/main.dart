@@ -39,7 +39,7 @@ class _MyAppState extends State<MyApp> {
         body: Padding(
           padding:
               fullscreen ? EdgeInsets.zero : const EdgeInsets.only(top: 32.0),
-          child: YoYoPlayer(
+          child: YoyoMoviePlayer(
             aspectRatio: 16 / 9,
             url:
                 // 'https://dsqqu7oxq6o1v.cloudfront.net/preview-9650dW8x3YLoZ8.webm',

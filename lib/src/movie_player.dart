@@ -9,10 +9,8 @@ import 'package:flutter_screen_wake/flutter_screen_wake.dart';
 import 'package:http/http.dart' as http;
 import 'package:lecle_yoyo_player/lecle_yoyo_player.dart';
 import 'package:lecle_yoyo_player/src/utils/utils.dart';
-import 'package:lecle_yoyo_player/src/widgets/live_player_bottombar.dart';
 import 'package:lecle_yoyo_player/src/widgets/video_loading.dart';
 import 'package:lecle_yoyo_player/src/widgets/video_quality_picker.dart';
-import 'package:lecle_yoyo_player/src/widgets/video_quality_widget.dart';
 import 'package:lecle_yoyo_player/src/widgets/widget_bottombar.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock/wakelock.dart';
@@ -22,14 +20,12 @@ import 'model/m3u8.dart';
 import 'model/m3u8s.dart';
 import 'responses/regex_response.dart';
 
-class YoYoPlayer extends StatefulWidget {
+class YoyoMoviePlayer extends StatefulWidget {
   /// **Video source**
   /// ```dart
   /// url:"https://example.com/index.m3u8";
   /// ```
-  final String url;
-
-  final ValueNotifier<int> refreshNotifier;
+  final ValueNotifier<String> urlChangeNotifier;
 
   /// Custom style for the video player
   ///```dart
@@ -51,6 +47,9 @@ class YoYoPlayer extends StatefulWidget {
   ///   );
   ///```
   final VideoStyle videoStyle;
+
+  /// a custom widget to show when loading the video
+  final Widget loadingWidget;
 
   /// The style for the loading widget which use while waiting for the video to load.
   /// ```dart
@@ -139,9 +138,9 @@ class YoYoPlayer extends StatefulWidget {
   ///   aspectRatio : 16/9,
   /// )
   /// ```
-  const YoYoPlayer({
+  const YoyoMoviePlayer({
     Key? key,
-    required this.url,
+    required this.urlChangeNotifier,
     this.aspectRatio = 16 / 9,
     this.videoStyle = const VideoStyle(),
     this.videoLoadingStyle = const VideoLoadingStyle(),
@@ -159,14 +158,14 @@ class YoYoPlayer extends StatefulWidget {
     this.onCachedFileFailed,
     this.onVideoInitCompleted,
     this.overlay = const SizedBox(),
-    required this.refreshNotifier,
+    this.loadingWidget = const VideoLoading(),
   }) : super(key: key);
 
   @override
-  _YoYoPlayerState createState() => _YoYoPlayerState();
+  _YoyoMoviePlayerState createState() => _YoyoMoviePlayerState();
 }
 
-class _YoYoPlayerState extends State<YoYoPlayer>
+class _YoyoMoviePlayerState extends State<YoyoMoviePlayer>
     with SingleTickerProviderStateMixin {
   /// Video play type (hls,mp4,mkv,offline)
   String? playType;
@@ -244,12 +243,20 @@ class _YoYoPlayerState extends State<YoYoPlayer>
   Duration? lastPlayedPos;
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    log("didChangeDependencies ===========================");
+  }
+
+  @override
   void initState() {
     super.initState();
 
-    urlCheck(widget.url);
+    log("init lecle called");
 
-    _startRefreshListener();
+    urlCheck(widget.urlChangeNotifier.value);
+
+    _addUrlChangeListener();
 
     /// Control bar animation
     controlBarAnimationController = AnimationController(
@@ -299,7 +306,10 @@ class _YoYoPlayerState extends State<YoYoPlayer>
     //   DeviceOrientation.landscapeRight,
     // ]);
 
-    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
 
     if (widget.displayFullScreenAfterInit) {
       // toggleFullScreen();
@@ -342,94 +352,10 @@ class _YoYoPlayerState extends State<YoYoPlayer>
                     ),
                   ),
                 ),
-                ...videoBuiltInChildren(),
+                // ...videoBuiltInChildren(),
               ],
             )
-          : _buildLoading(),
-    );
-  }
-
-  List<Widget> videoBuiltInChildren() {
-    return [
-      actionBar(),
-      bottomBar(),
-      // m3u8List(),
-    ];
-  }
-
-  /// Video player ActionBar
-  Widget actionBar() {
-    return Visibility(
-      visible: showMenu,
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Container(
-          width: MediaQuery.of(context).size.width,
-          padding: const EdgeInsets.symmetric(
-            horizontal: 25,
-            vertical: 10,
-          ),
-          color: fullScreen ? const Color(0xFF3D3C3C) : Colors.transparent,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              fullScreen
-                  ? GestureDetector(
-                      onTap: () {
-                        ScreenUtils.toggleFullScreen(fullScreen);
-                      },
-                      child: const Icon(
-                        Icons.arrow_back,
-                        color: Colors.white,
-                      ),
-                    )
-                  : const SizedBox(),
-              VideoQualityWidget(
-                key: videoQualityKey,
-                child: Text(m3u8Quality, style: widget.videoStyle.qualityStyle),
-                videoStyle: widget.videoStyle,
-                onTap: () {
-                  // Quality function
-                  setState(() {
-                    m3u8Show = !m3u8Show;
-
-                    if (m3u8Show) {
-                      showOverlay();
-                    } else {
-                      removeOverlay();
-                    }
-                  });
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// Video player BottomBar
-  Widget bottomBar() {
-    return Visibility(
-      visible: showMenu,
-      child: Align(
-        alignment: Alignment.bottomCenter,
-        child: LiveTvPlayerBottomBar(
-          controller: controller,
-          videoSeek: videoSeek ?? '00:00:00',
-          videoDuration: videoDuration ?? '00:00:00',
-          videoStyle: widget.videoStyle,
-          showBottomBar: showMenu,
-          onPlayButtonTap: () => togglePlay(),
-          onFastForward: (value) {
-            widget.onFastForward?.call(value);
-          },
-          onRewind: (value) {
-            widget.onRewind?.call(value);
-          },
-          toggleFullScreen: () => ScreenUtils.toggleFullScreen(fullScreen),
-        ),
-      ),
+          : widget.loadingWidget,
     );
   }
 
@@ -698,9 +624,9 @@ class _YoYoPlayerState extends State<YoYoPlayer>
 
     controller.addListener(listener);
 
-    if (widget.autoPlayVideoAfterInit) {
-      controller.play();
-    }
+    // if (widget.autoPlayVideoAfterInit) {
+    controller.play();
+    // }
     widget.onVideoInitCompleted?.call(controller);
   }
 
@@ -944,28 +870,13 @@ class _YoYoPlayerState extends State<YoYoPlayer>
     }
   }
 
-  void _startRefreshListener() {
-    widget.refreshNotifier.addListener(_refreshListener);
-  }
-
-  void _refreshListener() {
-    print("Refresh listener called");
-    if (controller.value.isPlaying) {
-      controller.pause();
-    }
-
-    lastPlayedPos = null;
-    videoInit(widget.url);
-    controller.play();
-  }
-
-  Widget _buildLoading() {
-    // _refresh();
-    return VideoLoading(loadingStyle: widget.videoLoadingStyle);
-  }
-
-  void _refresh() {
-    log("refreshing from _refresh");
-    widget.refreshNotifier.value++;
+  void _addUrlChangeListener() {
+    // reload controller when url changes
+    widget.urlChangeNotifier.addListener(() {
+      if (widget.urlChangeNotifier.value.isNotEmpty) {
+        controller.pause();
+        videoControlSetup(widget.urlChangeNotifier.value);
+      }
+    });
   }
 }
